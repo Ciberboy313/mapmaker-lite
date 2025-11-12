@@ -1,0 +1,26 @@
+[
+  {
+    "id": "log_2u5yytqt",
+    "ts": "2025-11-12T13:57:14.480Z",
+    "level": "info",
+    "message": "Logger initialized"
+  },
+  {
+    "id": "log_c9fztmah",
+    "ts": "2025-11-12T13:57:15.491Z",
+    "level": "info",
+    "message": "Logger initialized"
+  },
+  {
+    "id": "log_do98ctzk",
+    "ts": "2025-11-12T13:59:09.670Z",
+    "level": "info",
+    "message": "Logger initialized"
+  },
+  {
+    "id": "log_tl4xy7s9",
+    "ts": "2025-11-12T13:59:09.670Z",
+    "level": "info",
+    "message": "Logger initialized"
+  }
+]
