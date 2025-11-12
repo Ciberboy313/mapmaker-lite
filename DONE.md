@@ -5,7 +5,8 @@ Qui registriamo tutte le modifiche importanti già implementate nel progetto.
 - Sistemati warning/linter legati a Tailwind in `src/index.css` (direttive @tailwind sostituite o resettate per evitare falsi positivi).
 - Risolto errore di sintassi TSX in `src/App.tsx` che bloccava la build (escape/parse di `parseInt`/stringhe).
 - Build di produzione (Vite) eseguibile con successo (dist generata).
-- Dev server web (Vite) funzionante per sviluppo iterativo (Electron non avviabile nel container).
+- Dev server web (Vite) funzionante per sviluppo iterativo.
+- Electron verificato localmente (Node 20 LTS). In ambienti headless/CI potrebbe non avviarsi.
 - Implementati Assets e Folders:
   - Creazione cartelle inline con pulsante "Aggiungi" e supporto Enter/Escape.
   - Visualizzazione liste cartelle e lista "Senza folder".
@@ -26,6 +27,9 @@ Qui registriamo tutte le modifiche importanti già implementate nel progetto.
   - Shift + rotellina = scala (zoom) del singolo sprite quando selezionato.
   - Alt + rotellina = ruota lo sprite selezionato.
   - Alt + click + drag orizzontale = rotazione interattiva con il mouse.
+
+- Implementato Undo/Redo per sprite:
+  - Stack storico con scorciatoie Ctrl/Cmd+Z, Ctrl+Y o Ctrl+Shift+Z.
 
 ---
 Aggiorna questo file man mano che completi nuove attività (aggiungi data e riferimento PR/commit).

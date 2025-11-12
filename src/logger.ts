@@ -31,7 +31,19 @@ class Logger {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.buffer)); } catch (e) {}
     // always mirror to console
     const meta = entry.meta;
-    if (entry.level === 'error') console.error(entry.message, meta); else if (entry.level === 'warn') console.warn(entry.message, meta); else console.log(entry.message, meta);
+    const line = `[${entry.level.toUpperCase()}] ${entry.ts} ${entry.message}`;
+    if (entry.level === 'error') console.error(line, meta);
+    else if (entry.level === 'warn') console.warn(line, meta);
+    else if (entry.level === 'debug') console.debug(line, meta);
+    else console.log(line, meta);
+
+    // forward to main via IPC if available for file logging
+    try {
+      const api: any = (window as any).logAPI;
+      if (api && typeof api.log === 'function') {
+        api.log(entry.level, entry.message, entry.meta);
+      }
+    } catch {}
   }
 
   log(level: LogLevel, message: string, meta?: any) {

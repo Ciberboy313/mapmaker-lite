@@ -22,15 +22,14 @@ Questo file elenca i possibili punti deboli noti che possono causare rallentamen
   - Sintomi: alta CPU, scatti nell'interfaccia.
   - Contromisure: evitare il ridisegno completo quando non necessario, culling degli sprite non visibili, usare layering o WebGL.
 
-- Mancanza di undo/redo (Bassa ma UX importante)
-  - Descrizione: azioni irreversibili (cancellazione asset/sprite) non hanno undo.
-  - Sintomi: frustrante per l'utente.
-  - Contromisure: implementare un command stack con snapshot minimali (operazioni differenziali).
+- Undo/Redo da estendere (Bassa)
+  - Descrizione: undo/redo è presente per gli sprite, ma può essere esteso (limiti di profondità, grouping operazioni, memoria).
+  - Contromisure: configurare limiti e grouping; opzionale persistenza.
 
-- Electron packaging / install nel container (Bassa)
-  - Descrizione: Electron non si installa/avvia correttamente in questo ambiente container/CI.
-  - Sintomi: impossibilità di testare build desktop nel container.
-  - Contromisure: eseguire build/test Electron su macchine o runner con GUI o usare test headless su runner dedicati.
+- Electron in ambienti headless/CI (Bassa)
+  - Descrizione: in ambienti senza GUI (CI/headless) l'avvio/packaging Electron può fallire.
+  - Sintomi: impossibilità di testare build desktop nel runner.
+  - Contromisure: eseguire build/test su runner con GUI/virtual display; per sviluppo locale raccomandato Node 20 LTS per compatibilità con Electron 33.
 
 - LocalStorage limits & race conditions (Bassa)
   - Descrizione: salvataggi grandi possono fallire; accessi concorrenti a localStorage non sono atomici.

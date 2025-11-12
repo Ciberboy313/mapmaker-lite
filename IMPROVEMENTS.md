@@ -9,21 +9,21 @@ Formato suggerito per ogni voce:
 
 ## Priorità Alta
 
-- Revoca di ObjectURL dopo l'uso (Alta) — Chiamare `URL.revokeObjectURL` per evitare leak di memoria quando si caricano molte immagini. Impatto: memoria. Stima: 0.5 giorno.
-- Limitazione dimensione canvas di esportazione / streaming (Alta) — Gestire l'export per mappe molto grandi (tiling o downscale) per evitare crash/mancanza memoria. Impatto: stabilità. Stima: 1-2 giorni.
-- Persistenza stato (Alta) — Salvare `folders`, `assets`, `sprites` sul localStorage o backend per mantenere lo stato tra sessioni. Impatto: usabilità. Stima: 1 giorno.
+- Revoca di ObjectURL dopo l'uso (Alta) — Chiamare `URL.revokeObjectURL` quando un asset viene rimosso o ricaricato per evitare leak. Impatto: memoria. Stima: 0.5 giorno.
+- Limitazione dimensione canvas di esportazione / streaming (Alta) — Gestire l'export per mappe molto grandi (tiling o downscale) per evitare OOM. Impatto: stabilità. Stima: 1-2 giorni.
+- Persistenza stato (Alta) — Salvare `folders`, `assets`, `sprites`. Nota: preferire IndexedDB per payload grandi; usare localStorage solo per preferenze. Impatto: usabilità. Stima: 1 giorno.
 
 ## Priorità Media
 
 - Lazy-load preview / thumbnails (Media) — Generare thumbnail a bassa risoluzione per la lista assets per ridurre memoria e time-to-paint. Impatto: performance UI. Stima: 1-2 giorni.
-- Undo/Redo (Media) — Implementare stack di operazioni per annullare/ripristinare modifiche su sprite e folder. Impatto: UX avanzata. Stima: 2-3 giorni.
+- Undo/Redo: miglioramenti (Media) — Estendere lo stack (limiti, gruppi di operazioni, persistenza opzionale). Impatto: UX avanzata. Stima: 1-2 giorni.
 - Drag reorder layers nella colonna Layers (Media) — Permettere reorder con drag per cambiare Z-order facilmente. Impatto: UX. Stima: 1 giorno.
 - Migliorare la UI del context menu (Media) — Aggiungere icone, shortcut, sottomenù, accessibilità e navigazione da tastiera. Impatto: UX/accessibilità. Stima: 1 giorno.
 
 ## Priorità Bassa
 
 - Supporto cartelle annidate (Bassa) — Implementare gerarchia di cartelle per assets. Impatto: organizzazione. Stima: 2-3 giorni.
-- Ottimizzazioni WebGL (Bassa) — Valutare passaggio a WebGL per grandi scene (rendering più veloce). Impatto: performance su scene complesse. Stima: ricerca + PoC.
+- Ottimizzazioni WebGL (Bassa) — Ricerca/PoC per grandi scene (rendering più veloce). Impatto: performance su scene complesse. Stima: ricerca + PoC.
 - Modalità offline / sincronizzazione con cloud (Bassa) — Serializzare e sincronizzare stato via backend. Impatto: funzionalità. Stima: variabile.
 
 ## Note generali
