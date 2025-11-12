@@ -1,32 +1,50 @@
-# Piano di lavoro
+# Piano di lavoro (refactor UI + sviluppo)
 
-Questo file traccia attività, stato e note per implementare le priorità.
+Questo piano guida il refactoring dell'interfaccia (stile Inkarnate/DungeonDraft) e le prossime feature. Verrà aggiornato man mano che procediamo.
 
-## 1) Nuova mappa: modale iniziale + validazioni (In coda)
-- Modale/wizard "Nuova mappa" con: larghezza, altezza, griglia (on/size), background.
-- Rimuovere vincoli HTML rigidi (min/step) sui campi; validare lato JS e mostrare alert visivi.
-- Pulsante “Nuovo progetto” e salvataggio impostazioni iniziali.
+## Stato attuale (FATTO)
+- Save/Load progetto (JSON) + loader immagini con contatore
+- Export PNG con opzione trasparenza e avviso per mappe grandi
+- Menu nativo Electron + IPC sicuro (preload) tra Menu → Renderer
+- Logging persistente su file: `electron/logs/main-*.log`, `renderer-*.log`
+- Pannello Proprietà: controlli scala (1–200%), rotazione (±360°), opacità (0–100%) con slider + input numerico
+- Scorciatoie stile DD: Q/E rotazione, +/= e − scala %, ,/. opacità %, frecce (shift=10px), Del/Backspace elimina
+- Zoom bloccato per l’UI (solo canvas/asset zoomano); rimosse fasce inutili; pulita sezione Assets (niente controlli BG nelle card)
 
-Note: dimensioni accettano input libero; clamp e messaggi inline in caso di valori estremi.
+## Obiettivo macro
+Allineare il layout e l’UX agli editor di mappe moderni (Inkarnate/DungeonDraft): layout modulare 3 colonne, strumenti verticali, inspector chiaro, assets panel con ricerca e anteprime scalabili. Nessuno zoom dell’UI, solo del canvas.
 
-## 2) Revoca ObjectURL (Da fare)
-- Tracciare URL creati per ogni asset.
-- Revocare `URL.revokeObjectURL` su rimozione/replace/clear.
-- Verificare cambio background rilasci anche risorse.
+## Refactor UI – Roadmap dettagliata
 
-## 3) Export sicuro mappe grandi (Da fare)
-- Warning se pixel totali superano soglia (es. > 20M px).
-- Opzione downscale per export “safe”.
-- (Futuro) Tiling per export ad alta risoluzione.
+Step 1 — Componentizzazione minima (Inizio subito)
+- [ ] Aggiungere `src/types.ts` (Sprite/Asset/Folder) e usare i tipi condivisi
+- [ ] Estrarre `MapCanvas` in `src/components/MapCanvas.tsx` (senza cambiare API)
+- [ ] Estrarre `Inspector` (pannello destro) in `src/components/Inspector.tsx`
 
-## 4) Persistenza (MVP) (Da fare)
-- Salvare folders/assets metadata/sprites/mappa in IndexedDB.
-- Prompt avvio: caricare progetto esistente o crearne uno nuovo.
+Step 2 — Layout base modulare
+- [ ] Riorganizzare `App` con layout 3 colonne: `ToolsBar | MapCanvas | Inspector`
+- [ ] Aggiungere `TopStatus` sottile (zoom canvas, dimensione mappa, stato asset)
+- [ ] Compattare padding/margini per massimizzare spazio canvas
 
-## 5) Performance rendering (Da fare)
-- Flag “dirty” per evitare ridisegno continuo se nessun cambiamento.
-- Culling sprite fuori viewport.
+Step 3 — Assets panel
+- [ ] Estrarre `AssetsPanel.tsx` (griglia con cartelle)
+- [ ] Aggiungere ricerca e slider dimensione anteprime asset
 
-## Log cambiamenti
-- 2025-11-12: Creato PLAN.md e concordate priorità con maintainer.
+Step 4 — Tools bar
+- [ ] `ToolsBar.tsx` con strumenti verticali (select/move/rotate/scale/delete) e stato attivo
+
+Step 5 — QA e rifiniture
+- [ ] Verifica drag&drop asset su canvas, z‑order, delete/undo/redo
+- [ ] Allineare menù contestuali e scorciatoie; rimuovere comportamenti obsoleti
+
+## Backlog tecnico
+- [ ] Revoca `URL.revokeObjectURL` su rimozione/replace/background
+- [ ] Export sicuro per mappe enormi (downscale/tiled export)
+- [ ] Persistenza in IndexedDB (auto‑save + recenti)
+- [ ] Performance rendering: disegno “dirty” e culling offscreen
+
+## Note
+- Mantenere la compatibilità con il menu nativo e l’IPC.
+- Non introdurre zoom dell’UI: solo zoom del canvas/asset.
+- Ogni step deve essere piccolo e verificabile.
 

@@ -3,36 +3,9 @@ import { createPortal } from 'react-dom';
 import { logger, initGlobalErrorHandlers } from './logger';
 import { Download, Eye, EyeOff, Grid3X3, ImagePlus, Layers, Lock, LockOpen, MousePointer2, Move, Replace, RotateCw, Trash2, Upload, ZoomIn, ZoomOut, Maximize2, PanelLeft, PanelRight, Check, X, ChevronDown, ChevronRight, CornerUpLeft, CornerDownRight, Save, FolderOpen } from "lucide-react";
 import { serializeProject, validateAndMigrate } from './model/project';
+import type { Sprite, Asset, Folder } from './types';
 
-type Sprite = {
-  id: string;
-  name: string;
-  img: HTMLImageElement;
-  x: number;
-  y: number;
-  scale: number;
-  rotation: number;
-  opacity: number;
-  visible: boolean;
-  locked: boolean;
-  z: number;
-};
-
-type Asset = {
-  id: string;
-  name: string;
-  url: string;
-  img?: HTMLImageElement;
-  w?: number;
-  h?: number;
-  folderId?: string | null;
-  _objectUrl?: string; // track to revoke
-};
-
-type Folder = {
-  id: string;
-  name: string;
-};
+// Tipi importati da './types'
 
 function uid(prefix = "id"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
