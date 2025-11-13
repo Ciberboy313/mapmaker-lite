@@ -60,3 +60,33 @@ Opzioni:
 - Layer/ordinamento, lock/visibilità
 - Trasformazioni: posizione/scala/rotazione/opacità
 - Esportazione PNG
+
+## Scorciatoie principali
+- G: attiva/disattiva griglia
+- S: attiva/disattiva snap
+- Ctrl/Cmd + ]: porta in alto lo sprite selezionato
+- Ctrl/Cmd + [: sposta su di un livello
+- Ctrl/Cmd + Alt + ]: porta in alto (alias)
+- Ctrl/Cmd + Alt + [: porta in basso (z min)
+- Q/E: ruota sprite selezionato
+- +/-: scala sprite selezionato
+- ,/.: opacità sprite selezionato
+- Del/Backspace: elimina sprite
+
+## Test manuale rapido (QA)
+Canvas
+- Pan: tool Pan, middle, Shift+left
+- Rotate/Scale: drag orizzontale e rotella su sprite selezionato (Undo/Redo in un solo step)
+- Cursore cambia in base allo strumento e all’hover
+- Export: test a 100/75/50/25%
+
+Assets
+- Ricerca e slider anteprime
+- Drag asset → canvas: crea sprite
+- Drag asset → cartella: aggiorna folderId
+- Menu contestuale: asset/folder (rinomina, elimina, carica qui, set background)
+
+Layers/Inspector
+- Z‑order: su/giù, porta in alto/basso da UI e scorciatoie
+- Lock/Unlock e visibilità; delete con conferma
+- Undo/Redo per move/rotate/scale/opacity/lock

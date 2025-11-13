@@ -17,25 +17,46 @@ Allineare il layout e l’UX agli editor di mappe moderni (Inkarnate/DungeonDraf
 ## Refactor UI – Roadmap dettagliata
 
 Step 1 — Componentizzazione minima (Inizio subito)
-- [ ] Aggiungere `src/types.ts` (Sprite/Asset/Folder) e usare i tipi condivisi
-- [ ] Estrarre `MapCanvas` in `src/components/MapCanvas.tsx` (senza cambiare API)
-- [ ] Estrarre `Inspector` (pannello destro) in `src/components/Inspector.tsx`
+- [x] Aggiungere `src/types.ts` (Sprite/Asset/Folder) e usare i tipi condivisi
+- [x] Estrarre `MapCanvas` in `src/components/MapCanvas.tsx` (senza cambiare API)
+- [x] Estrarre `Inspector` (pannello destro) in `src/components/Inspector.tsx` e integrarlo in App
 
 Step 2 — Layout base modulare
-- [ ] Riorganizzare `App` con layout 3 colonne: `ToolsBar | MapCanvas | Inspector`
-- [ ] Aggiungere `TopStatus` sottile (zoom canvas, dimensione mappa, stato asset)
-- [ ] Compattare padding/margini per massimizzare spazio canvas
+- [x] Aggiungere `TopStatus` sottile (zoom canvas, dimensione mappa, stato asset)
+- [x] Aggiungere `ToolsBar` verticale (select/move/rotate/scale/delete)
+- [x] Riorganizzare area centrale con `ToolsBar | MapCanvas` e status overlay
+- [x] Rifinitura layout 3 colonne e compattazione padding/margini
 
 Step 3 — Assets panel
-- [ ] Estrarre `AssetsPanel.tsx` (griglia con cartelle)
-- [ ] Aggiungere ricerca e slider dimensione anteprime asset
+- [x] Estrarre `AssetsPanel.tsx` (griglia con cartelle)
+- [x] Aggiungere ricerca e slider dimensione anteprime asset
+- [x] DnD su cartelle (sposta asset), context menu (asset/folder), azione "Carica qui"
 
 Step 4 — Tools bar
-- [ ] `ToolsBar.tsx` con strumenti verticali (select/move/rotate/scale/delete) e stato attivo
+- [x] `ToolsBar.tsx` con strumenti verticali (select/move/rotate/scale/delete) e stato attivo
+- [x] Integrazione tool nel canvas: pan con tool Pan; Rotate/Scale via wheel senza mod; Delete a click
+- [x] Estendere interazioni (drag per scala/rotazione, feedback cursore e hover)
 
 Step 5 — QA e rifiniture
-- [ ] Verifica drag&drop asset su canvas, z‑order, delete/undo/redo
-- [ ] Allineare menù contestuali e scorciatoie; rimuovere comportamenti obsoleti
+- [x] Verifica drag&drop asset su canvas, z‑order, delete/undo/redo
+- [x] Allineare menù contestuali e scorciatoie; rimuovere comportamenti obsoleti
+- [x] Pulsante help con scorciatoie nel top bar
+
+## QA checklist
+- Canvas
+  - [ ] Pan (tool Pan, middle, Shift+left)
+  - [ ] Rotate/Scale: drag orizzontale e rotella su sprite selezionato (batch undo)
+  - [ ] Cursore contestuale per tool e hover
+  - [ ] Export PNG in varie scale (downscale 75/50/25)
+- Assets
+  - [ ] Ricerca e slider anteprime
+  - [ ] Drag asset → canvas crea sprite
+  - [ ] Drag asset → cartella sposta `folderId`
+  - [ ] Context menu: asset/folder (rinomina, elimina, carica qui, set background)
+- Layers/Inspector
+  - [ ] Z‑order: su/giù, porta in alto/basso da UI e scorciatoie
+  - [ ] Lock/Unlock e visibilità, delete con conferma
+  - [ ] Undo/Redo per move/rotate/scale/opacity/lock
 
 ## Backlog tecnico
 - [ ] Revoca `URL.revokeObjectURL` su rimozione/replace/background
@@ -47,4 +68,3 @@ Step 5 — QA e rifiniture
 - Mantenere la compatibilità con il menu nativo e l’IPC.
 - Non introdurre zoom dell’UI: solo zoom del canvas/asset.
 - Ogni step deve essere piccolo e verificabile.
-
