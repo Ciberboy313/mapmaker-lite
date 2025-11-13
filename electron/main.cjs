@@ -22,7 +22,16 @@ function createWindow() {
   });
 
   if (process.env.VITE_DEV_SERVER_URL) {
-    win.loadURL(process.env.VITE_DEV_SERVER_URL);
+    const devUrl = process.env.VITE_DEV_SERVER_URL;
+    console.log('[Main] DEV mode. VITE_DEV_SERVER_URL =', devUrl);
+    let attempts = 0;
+    const maxAttempts = 15;
+    const tryLoad = () => {
+      attempts++;
+      console.log(`[Main] loadURL attempt ${attempts}/${maxAttempts}`);
+      win.loadURL(devUrl).catch((e)=> console.error('[Main] loadURL error', e));
+    };
+    tryLoad();
     // win.webContents.openDevTools({ mode: 'detach' }); // disable auto DevTools to avoid interference
     win.webContents.on('did-finish-load', () => {
       console.log('[Main] Renderer did-finish-load');
@@ -40,6 +49,9 @@ function createWindow() {
     });
     win.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
       console.error('[Main] Renderer did-fail-load', { code, desc, url, isMainFrame });
+      if (attempts < maxAttempts) {
+        setTimeout(tryLoad, 500);
+      }
     });
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'));

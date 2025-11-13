@@ -34,6 +34,7 @@ pnpm preview
 ## Desktop (Electron)
 Sviluppo (apre Vite + Electron):
 ```bash
+cd mapmaker-lite
 pnpm dev          # oppure: npm run dev
 ```
 Build desktop (usa electron-builder):
@@ -43,7 +44,11 @@ pnpm build:desktop
 
 Note:
 - Gli script usano `concurrently` per avviare Vite ed Electron insieme.
-- Variabile `VITE_DEV_SERVER_URL` è gestita dallo script `dev` in `package.json`.
+- Variabile `VITE_DEV_SERVER_URL` è gestita dallo script `dev` in `package.json` e punta a `http://localhost:5173`.
+- Assicurati di lanciare i comandi dentro la cartella `mapmaker-lite/` (dove c'è `package.json`).
+- Se vedi solo il sito su 5173 e non parte Electron, prova ad avviare separatamente:
+  - `pnpm vite --port 5173`
+  - `cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .`
 
 ## Script di setup rapido (Windows)
 Esegui lo script PowerShell che installa/attiva Node (via nvm), installa dipendenze e avvia il dev server:
