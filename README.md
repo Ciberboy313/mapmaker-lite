@@ -2,96 +2,107 @@
 
 Editor leggero per mappe fantasy (worldbuilding) con PNG trasparenti.
 
+## Stato del Progetto
+
+Il progetto è in fase di sviluppo attivo. Per un elenco dettagliato delle funzionalità completate, consultare il file [DONE.md](DONE.md). Per le funzionalità pianificate e i miglioramenti futuri, vedere [IMPROVEMENTS.md](IMPROVEMENTS.md) e il [PLAN.md](PLAN.md).
+
+## Funzionalità Principali
+
+- **Editor Basato su Canvas:** Sposta, ruota, scala e regola l'opacità degli sprite.
+- **Gestione degli Asset:** Organizza gli asset (PNG, WebP, JPG) in cartelle, con ricerca e anteprime.
+- **Drag & Drop:** Trascina gli asset sulla tela per creare sprite e tra le cartelle per organizzarli.
+- **Layer e Ordinamento:** Gestisci l'ordine degli sprite (z-index), bloccali e nascondili.
+- **Griglia e Snap:** Attiva/disattiva una griglia e l'aggancio degli oggetti per un posizionamento preciso.
+- **Undo/Redo:** Annulla e ripristina le modifiche agli sprite.
+- **Esportazione in PNG:** Esporta la tua mappa come immagine PNG, con opzioni di ridimensionamento.
+- **Salva/Carica Progetto:** Salva il tuo lavoro in un file JSON e ricaricalo in seguito.
+- **Scorciatoie da Tastiera:** Un set completo di scorciatoie per un flusso di lavoro più rapido.
+- **Applicazione Desktop:** Disponibile come applicazione desktop multipiattaforma grazie a Electron.
+
+## Tech Stack
+
+- **Framework:** React
+- **Linguaggio:** TypeScript
+- **Desktop:** Electron
+- **Build Tool:** Vite
+- **Styling:** Tailwind CSS
+
 ## Prerequisiti
-- Node.js LTS (18 o 20) consigliato con nvm-windows.
+- Node.js LTS (consigliato v20.x) con nvm o nvm-windows.
 - Un gestore pacchetti: `pnpm` (consigliato) o `npm`.
 
 Installazione rapida su Windows con nvm-windows:
 1. Scarica l'installer: https://github.com/coreybutler/nvm-windows/releases
-2. `nvm install 20.17.0 && nvm use 20.17.0`
-3. Verifica: `node -v` `npm -v`
+2. `nvm install 20 && nvm use 20`
+3. Verifica: `node -v` e `npm -v`
 4. Installa pnpm (opzionale): `npm i -g pnpm`
 
-## Avvio (web)
-Con pnpm:
+## Avvio (Sviluppo)
+
+**Applicazione Web:**
 ```bash
-pnpm i
+# Con pnpm
+pnpm install
 pnpm dev
-```
-Con npm:
-```bash
+
+# Con npm
 npm install
 npm run dev
 ```
-Apri http://localhost:5173
+Apri l'URL mostrato nel terminale (di solito http://localhost:5173).
 
-## Build web
+**Applicazione Desktop (Electron):**
+Lo script `dev` avvia sia il server di sviluppo Vite che l'applicazione Electron.
 ```bash
-pnpm build
-pnpm preview
+# Con pnpm
+pnpm install
+pnpm dev
+
+# Con npm
+npm install
+npm run dev
 ```
 
-## Desktop (Electron)
-Sviluppo (apre Vite + Electron):
+## Build
+
+**Build Web:**
 ```bash
-cd mapmaker-lite
-pnpm dev          # oppure: npm run dev
+pnpm build:web
 ```
-Build desktop (usa electron-builder):
+I file di produzione saranno nella cartella `dist`.
+
+**Build Desktop:**
 ```bash
 pnpm build:desktop
 ```
-
-Note:
-- Gli script usano `concurrently` per avviare Vite ed Electron insieme.
-- Variabile `VITE_DEV_SERVER_URL` è gestita dallo script `dev` in `package.json` e punta a `http://localhost:5173`.
-- Assicurati di lanciare i comandi dentro la cartella `mapmaker-lite/` (dove c'è `package.json`).
-- Se vedi solo il sito su 5173 e non parte Electron, prova ad avviare separatamente:
-  - `pnpm vite --port 5173`
-  - `cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .`
+L'eseguibile per il tuo sistema operativo sarà nella cartella `dist`.
 
 ## Script di setup rapido (Windows)
-Esegui lo script PowerShell che installa/attiva Node (via nvm), installa dipendenze e avvia il dev server:
+Esegui lo script PowerShell che installa/attiva Node (via nvm), installa le dipendenze e avvia il server di sviluppo:
 ```powershell
 pwsh -File scripts/setup-and-run.ps1
 ```
-Opzioni:
-- Specifica versione Node: `pwsh -File scripts/setup-and-run.ps1 -NodeVersion 20.17.0`
-- Forza uso npm al posto di pnpm: `pwsh -File scripts/setup-and-run.ps1 -UseNpm`
-
-## Funzioni
-- Drag&drop asset (PNG/WebP/JPG)
-- Griglia + Snap
-- Layer/ordinamento, lock/visibilità
-- Trasformazioni: posizione/scala/rotazione/opacità
-- Esportazione PNG
 
 ## Scorciatoie principali
-- G: attiva/disattiva griglia
-- S: attiva/disattiva snap
-- Ctrl/Cmd + ]: porta in alto lo sprite selezionato
-- Ctrl/Cmd + [: sposta su di un livello
-- Ctrl/Cmd + Alt + ]: porta in alto (alias)
-- Ctrl/Cmd + Alt + [: porta in basso (z min)
-- Q/E: ruota sprite selezionato
-- +/-: scala sprite selezionato
-- ,/.: opacità sprite selezionato
-- Del/Backspace: elimina sprite
+- **G**: attiva/disattiva griglia
+- **S**: attiva/disattiva snap
+- **Ctrl/Cmd + ]**: porta in alto lo sprite selezionato
+- **Ctrl/Cmd + [**: sposta su di un livello
+- **Ctrl/Cmd + Alt + ]**: porta in alto (alias)
+- **Ctrl/Cmd + Alt + [**: porta in basso (z min)
+- **Q/E**: ruota sprite selezionato
+- **+/-**: scala sprite selezionato
+- **,/.**: opacità sprite selezionato
+- **Del/Backspace**: elimina sprite
 
-## Test manuale rapido (QA)
-Canvas
-- Pan: tool Pan, middle, Shift+left
-- Rotate/Scale: drag orizzontale e rotella su sprite selezionato (Undo/Redo in un solo step)
-- Cursore cambia in base allo strumento e all’hover
-- Export: test a 100/75/50/25%
+## Architettura
 
-Assets
-- Ricerca e slider anteprime
-- Drag asset → canvas: crea sprite
-- Drag asset → cartella: aggiorna folderId
-- Menu contestuale: asset/folder (rinomina, elimina, carica qui, set background)
+L'architettura del progetto è documentata in [ARCHITECTURE.md](ARCHITECTURE.md). Questo file fornisce una panoramica della struttura del codice, del modello dei dati e dei flussi principali.
 
-Layers/Inspector
-- Z‑order: su/giù, porta in alto/basso da UI e scorciatoie
-- Lock/Unlock e visibilità; delete con conferma
-- Undo/Redo per move/rotate/scale/opacity/lock
+## Problemi Noti
+
+Siamo a conoscenza di alcuni problemi e aree di miglioramento. Consulta il file [KNOWN_ISSUES.md](KNOWN_ISSUES.md) per maggiori dettagli.
+
+## Contribuire
+
+I contributi sono i benvenuti! Se vuoi contribuire, dai un'occhiata al nostro [PLAN.md](PLAN.md) per vedere la roadmap di sviluppo.

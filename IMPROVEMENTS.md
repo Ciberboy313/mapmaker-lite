@@ -9,16 +9,20 @@ Formato suggerito per ogni voce:
 
 ## Priorità Alta
 
-- Revoca di ObjectURL dopo l'uso (Alta) — Chiamare `URL.revokeObjectURL` quando un asset viene rimosso o ricaricato per evitare leak. Impatto: memoria. Stima: 0.5 giorno.
-- Limitazione dimensione canvas di esportazione / streaming (Alta) — Gestire l'export per mappe molto grandi (tiling o downscale) per evitare OOM. Impatto: stabilità. Stima: 1-2 giorni.
-- Persistenza stato (Alta) — Salvare `folders`, `assets`, `sprites`. Nota: preferire IndexedDB per payload grandi; usare localStorage solo per preferenze. Impatto: usabilità. Stima: 1 giorno.
+- Revoca di ObjectURL dopo l'uso (Alta) - Chiamare `URL.revokeObjectURL` quando un asset viene rimosso o ricaricato per evitare leak. Impatto: memoria. Stima: 0.5 giorno.
+- Limitazione dimensione canvas di esportazione / streaming (Alta) - Gestire l'export per mappe molto grandi (tiling o downscale) per evitare OOM. Impatto: stabilità. Stima: 1-2 giorni.
+- Persistenza stato (Alta) - Salvare `folders`, `assets`, `sprites`. Nota: preferire IndexedDB per payload grandi; usare localStorage solo per preferenze. Impatto: usabilità. Stima: 1 giorno.
+- Unificazione pipeline export (Alta) - Estrarre utility unica per render/export PNG (modale e toolbar) per evitare divergenze. Impatto: affidabilità. Stima: 0.5-1 giorno.
+- Collegamento sprite→asset via `assetId` (Alta) - Evitare link per nome per robustezza (anteprime layer, salvataggi). Impatto: stabilità. Stima: 0.5-1 giorno.
 
 ## Priorità Media
 
-- Lazy-load preview / thumbnails (Media) — Generare thumbnail a bassa risoluzione per la lista assets per ridurre memoria e time-to-paint. Impatto: performance UI. Stima: 1-2 giorni.
-- Undo/Redo: miglioramenti (Media) — Estendere lo stack (limiti, gruppi di operazioni, persistenza opzionale). Impatto: UX avanzata. Stima: 1-2 giorni.
-- Drag reorder layers nella colonna Layers (Media) — Permettere reorder con drag per cambiare Z-order facilmente. Impatto: UX. Stima: 1 giorno.
-- Migliorare la UI del context menu (Media) — Aggiungere icone, shortcut, sottomenù, accessibilità e navigazione da tastiera. Impatto: UX/accessibilità. Stima: 1 giorno.
+- Lazy-load preview / thumbnails (Media) - Generare thumbnail a bassa risoluzione per la lista assets per ridurre memoria e time-to-paint. Impatto: performance UI. Stima: 1-2 giorni.
+- Undo/Redo: miglioramenti (Media) - Estendere lo stack (limiti, gruppi di operazioni, persistenza opzionale). Impatto: UX avanzata. Stima: 1-2 giorni.
+- Drag reorder layers nella colonna Layers (Media) - Permettere reorder con drag per cambiare Z-order facilmente. Impatto: UX. Stima: 1 giorno.
+- Migliorare la UI del context menu (Media) - Aggiungere icone, shortcut, sottomenù, accessibilità e navigazione da tastiera. Impatto: UX/accessibilità. Stima: 1 giorno.
+- Cap memoria stack Undo/Redo (Media) - Introdurre un limite massimo di snapshot (es. 100) e batching temporale. Impatto: stabilità. Stima: 0.5 giorno.
+- Compattazione verticale interfaccia (Media) - Ridurre padding/margini di topbar/header e overlay, massimizzando canvas verticale. Impatto: ergonomia. Stima: 0.5 giorno.
 
 ## Priorità Bassa
 
@@ -35,3 +39,4 @@ Formato suggerito per ogni voce:
 ---
 
 Aggiorna questo file man mano che emergono nuove idee o cambiano priorità.
+

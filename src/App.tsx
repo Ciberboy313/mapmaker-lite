@@ -9,6 +9,7 @@ import Inspector from './components/Inspector';
 import ToolsBar, { type Tool } from './components/ToolsBar';
 import TopStatus from './components/TopStatus';
 import AssetsPanel from './components/AssetsPanel';
+import { renderToCanvas, canvasToBlobPNG } from './utils/export-canvas';
 
 function uid(prefix = "id"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
@@ -62,6 +63,14 @@ export default function App() {
   const [redoStack, setRedoStack] = useState<Sprite[][]>([]);
   const spritesRef = useRef<Sprite[]>(sprites);
   useEffect(() => { spritesRef.current = sprites; }, [sprites]);
+  // On unmount, revoke any remaining object URLs tied to assets
+  useEffect(() => {
+    return () => {
+      try {
+        assets.forEach(a => { if ((a as any)._objectUrl) { try { URL.revokeObjectURL((a as any)._objectUrl as any); } catch {} } });
+      } catch {}
+    };
+  }, [assets]);
   // batch interaction helpers for commit-on-mouseup
   const interactionStartRef = useRef<Sprite[] | null>(null);
   const beginSpriteInteraction = useCallback(() => {
@@ -69,12 +78,13 @@ export default function App() {
       interactionStartRef.current = spritesRef.current;
     }
   }, []);
+  const UNDO_LIMIT = 100;
   const commitSpriteInteraction = useCallback(() => {
     if (interactionStartRef.current) {
       const snapshot = interactionStartRef.current;
       interactionStartRef.current = null;
       // push snapshot to undo and clear redo
-      setUndoStack(u => [...u, snapshot]);
+      setUndoStack(u => { const next = [...u, snapshot]; if (next.length > UNDO_LIMIT) next.splice(0, next.length - UNDO_LIMIT); return next; });
       setRedoStack([]);
     }
   }, []);
@@ -214,9 +224,58 @@ export default function App() {
   const [mapSize, setMapSize] = useState({ w: 4096, h: 3072 });
   const [newMapOpen, setNewMapOpen] = useState<boolean>(false);
   const [newMapDraft, setNewMapDraft] = useState<{ w: string; h: string; grid: boolean; gridSize: string; backgroundAssetId: string | ''; error?: string; warnLarge?: boolean; fieldErrors?: { w?: string; h?: string; gridSize?: string } }>({ w: '4096', h: '3072', grid: true as any, gridSize: '64', backgroundAssetId: '' });
+  const canCreateNewMap = useMemo(() => {
+    const w = parseInt(newMapDraft.w, 10);
+    const h = parseInt(newMapDraft.h, 10);
+    const g = parseInt(newMapDraft.gridSize, 10);
+    return Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0 && Number.isFinite(g) && g > 0;
+  }, [newMapDraft.w, newMapDraft.h, newMapDraft.gridSize]);
+
+  const performCreateNewMap = useCallback(() => {
+    const w = parseInt(newMapDraft.w, 10);
+    const h = parseInt(newMapDraft.h, 10);
+    const g = parseInt(newMapDraft.gridSize, 10);
+    const fe: any = {};
+    if (!Number.isFinite(w) || w <= 0) fe.w = 'Inserisci un intero > 0';
+    if (!Number.isFinite(h) || h <= 0) fe.h = 'Inserisci un intero > 0';
+    if (!Number.isFinite(g) || g <= 0) fe.gridSize = 'Inserisci un intero > 0';
+    if (Object.keys(fe).length) { setNewMapDraft(d=> ({...d, fieldErrors: fe, error: 'Correggi i campi evidenziati'})); return; }
+    const tooLarge = w * h > 20_000_000;
+    setNewMapDraft(d=> ({...d, warnLarge: tooLarge, error: d.error && !tooLarge ? d.error : undefined }));
+    setMapSize({ w, h });
+    setGrid(!!newMapDraft.grid);
+    setGridSize(g);
+    if (newMapDraft.backgroundAssetId) {
+      setBackgroundAssetId(newMapDraft.backgroundAssetId);
+      // Ensure background image is loaded
+      const bg = assets.find(a => a.id === newMapDraft.backgroundAssetId);
+      if (bg && !bg.img && bg.url) {
+        try {
+          const im = new Image();
+          im.onload = () => {
+            setAssets(prev => prev.map(x => x.id === bg.id ? { ...x, img: im, w: im.width, h: im.height } : x));
+          };
+          im.src = bg.url;
+        } catch {}
+      }
+      setRecentBackgroundIds(prev => {
+        const next = [newMapDraft.backgroundAssetId!, ...prev.filter(id => id !== newMapDraft.backgroundAssetId)];
+        return next.slice(0,5);
+      });
+    } else setBackgroundAssetId(null);
+    setPan({ x: 40, y: 40 });
+    setZoom(1);
+    setNewMapOpen(false);
+    // reset draft for next time
+    setTimeout(() => setNewMapDraft({ w: String(w), h: String(h), grid: true as any, gridSize: String(g), backgroundAssetId: '' }), 0);
+  }, [newMapDraft, setMapSize, setGrid, setGridSize, setBackgroundAssetId, setPan, setZoom, setRecentBackgroundIds, assets, setAssets]);
   const [loadingAssetsCount, setLoadingAssetsCount] = useState(0);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportOptions, setExportOptions] = useState<{ transparent: boolean }>(() => ({ transparent: true }));
+  const [exportOptions, setExportOptions] = useState<{ transparent: boolean; scale: number }>(() => {
+    let scale = 1;
+    try { const s = parseFloat(localStorage.getItem('lastExportScale')||''); if (s>0 && s<=1) scale = s; } catch {}
+    return { transparent: true, scale };
+  });
   const [showAssets, setShowAssets] = useState(true);
   const [showLayers, setShowLayers] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
@@ -370,42 +429,37 @@ export default function App() {
 
   const exportPng = useCallback(async () => {
     try {
-      const pixels = mapSize.w * mapSize.h;
+      const scale = (exportOptions as any).scale ?? 1;
+      const pixels = Math.max(1, Math.floor(mapSize.w * scale)) * Math.max(1, Math.floor(mapSize.h * scale));
       const MEGA = 1_000_000;
       if (pixels > 50 * MEGA) {
-        const proceed = window.confirm(`Attenzione: l'export è molto grande (${mapSize.w}×${mapSize.h}, ~${Math.round(pixels/MEGA)} MP). Potrebbe fallire o essere lento. Procedere?`);
+        const proceed = window.confirm(`Attenzione: l'export è molto grande (, ~${Math.round(pixels/MEGA)} MP). Potrebbe fallire o essere lento. Procedere?`);
         if (!proceed) { return; }
       }
-      const off = document.createElement('canvas');
-      off.width = mapSize.w; off.height = mapSize.h;
-      const ctx = off.getContext('2d', { alpha: exportOptions.transparent })!;
-      if (!exportOptions.transparent) {
-        ctx.fillStyle = '#0f162b';
-        ctx.fillRect(0,0,off.width,off.height);
-      } else {
-        ctx.clearRect(0,0,off.width,off.height);
-      }
-      // background
-      if (backgroundAssetId) {
-        const bg = assets.find(a => a.id === backgroundAssetId);
-        if (bg?.img && bg.img.complete) {
-          try { ctx.drawImage(bg.img, 0, 0, mapSize.w, mapSize.h); } catch {}
+      let blob: Blob;
+      try {
+        const canvas = renderToCanvas({ assets, sprites, backgroundAssetId, mapSize, scale, transparent: exportOptions.transparent });
+        blob = await canvasToBlobPNG(canvas);
+      } catch (err) {
+        // Fallback legacy path in caso di problemi con la utility condivisa
+        const off = document.createElement('canvas');
+        off.width = Math.max(1, Math.floor(mapSize.w * scale));
+        off.height = Math.max(1, Math.floor(mapSize.h * scale));
+        const ctx = off.getContext('2d', { alpha: exportOptions.transparent })!;
+        if (!exportOptions.transparent) { ctx.fillStyle = '#0f162b'; ctx.fillRect(0,0,off.width,off.height); } else { ctx.clearRect(0,0,off.width,off.height); }
+        if (backgroundAssetId) {
+          const bg = assets.find(a => a.id === backgroundAssetId);
+          if (bg?.img && bg.img.complete) { try { ctx.drawImage(bg.img, 0, 0, off.width, off.height); } catch {} }
         }
+        const ordered = [...sprites].sort((a,b)=> a.z - b.z);
+        for (const s of ordered) {
+          if (!s.visible) continue; const img = s.img; if (!img || !img.complete) continue;
+          ctx.save(); ctx.globalAlpha = s.opacity; ctx.translate(s.x * scale, s.y * scale); ctx.rotate((s.rotation*Math.PI)/180); ctx.scale(s.scale * scale, s.scale * scale);
+          try { ctx.drawImage(img, 0, 0); } catch {}
+          ctx.restore();
+        }
+        blob = await new Promise((res)=> off.toBlob(b=> res(b!), 'image/png')) as Blob;
       }
-      // sprites in z-order
-      const ordered = [...sprites].sort((a,b)=> a.z - b.z);
-      for (const s of ordered) {
-        if (!s.visible) continue;
-        const img = s.img; if (!img || !img.complete) continue;
-        ctx.save();
-        ctx.globalAlpha = s.opacity;
-        ctx.translate(s.x, s.y);
-        ctx.rotate((s.rotation*Math.PI)/180);
-        ctx.scale(s.scale, s.scale);
-        try { ctx.drawImage(img, 0, 0); } catch {}
-        ctx.restore();
-      }
-      const blob: Blob = await new Promise((res)=> off.toBlob(b=> res(b!), 'image/png'));
       const name = `map-export-${new Date().toISOString().replace(/[:.]/g,'_')}.png`;
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(()=> URL.revokeObjectURL(a.href), 1000);
       setExportOpen(false);
@@ -417,21 +471,26 @@ export default function App() {
 
   return (
     <>
+    {/* hidden asset upload input is rendered inside EditorUI where onHiddenFileChange is defined */}
     {/* Remove HTML menubar to avoid duplication with native menu. Keep status bar at right. */}
-    <div className="w-full h-8 bg-slate-950/60 border-b border-slate-800 flex items-center px-3 gap-4 text-slate-200">
+    <div className="w-full h-6 bg-slate-950/60 border-b border-slate-800 flex items-center px-3 gap-4 text-slate-200">
       <div className="ml-auto text-xs text-slate-400">
-        {loadingAssetsCount > 0 ? `Caricamento asset… (${loadingAssetsCount})` : `Zoom ${Math.round(zoom*100)}% • ${mapSize.w}×${mapSize.h}`}
+        {loadingAssetsCount > 0 ? `Caricamento asset… (${loadingAssetsCount})` : ``}
       </div>
     </div>
     {/* floating quick action removed in favor of menu */}
 
     {newMapOpen && createPortal((
       <div className="fixed inset-0 z-[9999] grid place-items-center bg-black/50" onClick={()=> setNewMapOpen(false)}>
-        <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 w-[420px] text-slate-100" onClick={(e)=> e.stopPropagation()}>
-          <div className="text-lg font-semibold mb-3">Crea nuova mappa</div>
+        <div className="bg-slate-900 border border-slate-700 rounded-lg p-0 w-[460px] text-slate-100" onClick={(e)=> e.stopPropagation()} onKeyDown={(e)=> {
+          if (e.key === 'Escape') { e.preventDefault(); setNewMapOpen(false); return; }
+          if (e.key === 'Enter') { e.preventDefault(); if (canCreateNewMap) performCreateNewMap(); }
+        }}>
+          <form onSubmit={(e)=> { e.preventDefault(); if (canCreateNewMap) performCreateNewMap(); }}>
+          <div className="text-lg font-semibold mb-3 px-4 pt-4">Crea nuova mappa</div>
           {newMapDraft.error && <div className="mb-2 text-sm text-red-300 bg-red-900/30 border border-red-700 rounded px-2 py-1">{newMapDraft.error}</div>}
           {newMapDraft.warnLarge && <div className="mb-2 text-xs text-amber-200 bg-amber-900/30 border border-amber-700 rounded px-2 py-1">Mappa molto grande: potrebbero verificarsi rallentamenti o errori in export.</div>}
-          <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-2 gap-3 mb-3 px-4">
             <div>
               <div className="text-xs text-slate-300 mb-1">Larghezza (px)</div>
               <input className={`w-full bg-slate-800 rounded px-2 py-1 ${newMapDraft.fieldErrors?.w? 'border border-red-600':''}`} value={newMapDraft.w} onChange={(e)=> setNewMapDraft(d=> ({...d, w: e.target.value, fieldErrors: {...(d.fieldErrors||{}), w: undefined}}))} placeholder="es. 4096" />
@@ -456,9 +515,10 @@ export default function App() {
             {/* Preset rapidi */}
             <div className="col-span-2 flex items-center gap-2 text-xs">
               <span className="text-slate-400">Preset:</span>
-              <button className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={()=> setNewMapDraft(d=> ({...d, w: '1920', h: '1080'}))}>Small 1920×1080</button>
-              <button className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={()=> setNewMapDraft(d=> ({...d, w: '4096', h: '3072'}))}>Medium 4096×3072</button>
-              <button className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={()=> setNewMapDraft(d=> ({...d, w: '8192', h: '6144'}))}>Large 8192×6144</button>
+              <button className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={()=> setNewMapDraft(d=> ({...d, w: '1280', h: '720'}))}>HD 1280×720</button>
+              <button className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={()=> setNewMapDraft(d=> ({...d, w: '1920', h: '1080'}))}>Full HD 1920×1080</button>
+              <button className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={()=> setNewMapDraft(d=> ({...d, w: '4096', h: '3072'}))}>Ultra HD 2560×1440</button>
+              <button className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={()=> setNewMapDraft(d=> ({...d, w: '3840', h: '2160'}))}>Large 8192×6144</button>
               <button className="ml-auto px-2 py-1 rounded bg-slate-800 hover:bg-slate-700" title="Usa dimensioni correnti" onClick={()=> setNewMapDraft(d=> ({...d, w: String(mapSize.w), h: String(mapSize.h)}))}>Usa dimensioni correnti</button>
             </div>
             <div className="col-span-2">
@@ -495,7 +555,9 @@ export default function App() {
                 const id = uid('asset');
                 const a: Asset = { id, name: `Background: ${f.name}` , url, folderId: null, _objectUrl: url };
                 const img = new Image();
-                img.onload = () => { a.img = img; a.w = img.width; a.h = img.height; setAssets(prev => [...prev]); };
+                img.onload = () => { a.img = img; a.w = img.width; a.h = img.height; setAssets(prev => [...prev]);
+                  if (a._objectUrl) { try { URL.revokeObjectURL(a._objectUrl); } catch {} a._objectUrl = undefined as any; }
+                };
                 img.src = url;
                 setAssets(prev => [...prev, a]);
                 setNewMapDraft(d=> ({...d, backgroundAssetId: id }));
@@ -503,35 +565,11 @@ export default function App() {
               <div className="mt-2 text-xs text-slate-400">Puoi anche caricare o scegliere un background dopo la creazione.</div>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <button className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={()=> setNewMapOpen(false)}>Annulla</button>
-            <button className="px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white" onClick={()=> {
-              // parse and validate
-              const w = parseInt(newMapDraft.w, 10);
-              const h = parseInt(newMapDraft.h, 10);
-              const g = parseInt(newMapDraft.gridSize, 10);
-              const fe: any = {};
-              if (!Number.isFinite(w) || w <= 0) fe.w = 'Inserisci un intero > 0';
-              if (!Number.isFinite(h) || h <= 0) fe.h = 'Inserisci un intero > 0';
-              if (!Number.isFinite(g) || g <= 0) fe.gridSize = 'Inserisci un intero > 0';
-              if (Object.keys(fe).length) { setNewMapDraft(d=> ({...d, fieldErrors: fe, error: 'Correggi i campi evidenziati'})); return; }
-              const tooLarge = w * h > 20_000_000;
-              setNewMapDraft(d=> ({...d, warnLarge: tooLarge, error: d.error && !tooLarge ? d.error : undefined }));
-              setMapSize({ w, h });
-              setGrid(!!newMapDraft.grid);
-              setGridSize(g);
-              if (newMapDraft.backgroundAssetId) {
-                setBackgroundAssetId(newMapDraft.backgroundAssetId);
-                setRecentBackgroundIds(prev => {
-                  const next = [newMapDraft.backgroundAssetId!, ...prev.filter(id => id !== newMapDraft.backgroundAssetId)];
-                  return next.slice(0,5);
-                });
-              } else setBackgroundAssetId(null);
-              setPan({ x: 40, y: 40 });
-              setZoom(1);
-              setNewMapOpen(false);
-            }}>Crea</button>
+          <div className="flex justify-end gap-2 px-4 pb-4">
+            <button type="button" className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700" onClick={()=> setNewMapOpen(false)}>Annulla</button>
+            <button type="submit" id="btn-create-map" className={`px-3 py-1 rounded text-white ${canCreateNewMap ? 'bg-sky-600 hover:bg-sky-500' : 'bg-slate-700 cursor-not-allowed opacity-60'}`} onClick={(e)=> { if (!canCreateNewMap) { e.preventDefault(); return; } }} disabled={!canCreateNewMap}>Crea</button>
           </div>
+          </form>
         </div>
       </div>
     ), document.getElementById('overlay-root')!)}
@@ -541,6 +579,14 @@ export default function App() {
         <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 w-[360px] text-slate-100" onClick={(e)=> e.stopPropagation()}>
           <div className="text-lg font-semibold mb-3">Esporta PNG</div>
           <div className="mb-3 text-sm text-slate-300">Dimensione export: {mapSize.w}×{mapSize.h}</div>
+          <div className="mb-3 text-sm text-slate-300 flex items-center gap-2">
+            <span>Scala export:</span>
+            <select className="bg-slate-800 rounded px-2 py-1" value={(exportOptions as any).scale}
+              onChange={(e)=> { const s = parseFloat(e.target.value); setExportOptions((o:any)=> ({...o, scale: s})); try { localStorage.setItem('lastExportScale', String(s)); } catch {} }}>
+              {[1,0.75,0.5,0.25].map(s => (<option key={s} value={s}>{Math.round(s*100)}%</option>))}
+            </select>
+            <span className="opacity-70">→ {Math.max(1, Math.floor(mapSize.w * ((exportOptions as any).scale ?? 1)))}×{Math.max(1, Math.floor(mapSize.h * ((exportOptions as any).scale ?? 1)))}</span>
+          </div>
           <label className="inline-flex items-center gap-2 mb-4 text-sm">
             <input type="checkbox" checked={exportOptions.transparent} onChange={(e)=> setExportOptions(o=> ({...o, transparent: e.target.checked}))} />
             Sfondo trasparente (se disattivo, usa #0f162b)
@@ -556,7 +602,7 @@ export default function App() {
     {/* hidden file input for project load */}
     <input ref={projectInputRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={onProjectFile} />
 
-    <div className="flex h-[calc(100vh-2rem)] w-full">{/* subtract top status bar height */}
+    <div className="flex h-full w-full">{/* fill available height; page has overflow hidden */}
     <EditorUI
       assets={assets} setAssets={setAssets}
       folders={folders} setFolders={setFolders} selectedFolderId={selectedFolderId} setSelectedFolderId={setSelectedFolderId}
@@ -726,7 +772,10 @@ function EditorUI(props: EditorProps) {
       if (!f.type.startsWith('image/')) continue;
       const url = URL.createObjectURL(f); const id = uid('asset');
       const a: Asset = { id, name: f.name, url, folderId: targetFolder || null, _objectUrl: url };
-      const img = new Image(); img.onload = () => { a.img = img; a.w = img.width; a.h = img.height; props.setAssets(prev => [...prev]); };
+      const img = new Image(); img.onload = () => { a.img = img; a.w = img.width; a.h = img.height; props.setAssets(prev => [...prev]);
+        // Revoke blob URL once decoded to avoid memory leaks
+        if (a._objectUrl) { try { URL.revokeObjectURL(a._objectUrl); } catch {} (a as any)._objectUrl = undefined; }
+      };
       img.onerror = (err) => { logger.error('Image load failed', { name: f.name, type: f.type, size: f.size, err: String(err) }); };
       img.src = url; list.push(a);
     }
@@ -820,7 +869,13 @@ function EditorUI(props: EditorProps) {
             {assets.map(a => (
               <div key={a.id} draggable={true} onDragStart={(e)=> { e.dataTransfer.setData('text/plain', a.id); setHoveredFolderId(null); }} onDragEnd={() => setHoveredFolderId(null)} onClick={(e)=> { e.stopPropagation(); setSelectedAssetUI(a.id); }} onContextMenu={(e)=> openContextMenu(e, 'asset', a.id)} className={`group rounded-xl overflow-hidden border ${selectedAssetUI===a.id? 'border-sky-400 bg-sky-400/6':'border-slate-800 hover:border-slate-600'}`}>
                 <div className="aspect-square bg-slate-800/60 grid place-items-center">
-                  {a.url ? <img src={a.url} alt={a.name} className="max-w-full max-h-full object-contain"/> : <ImagePlus/>}
+                  {a.img?.src ? (
+                    <img src={a.img.src} alt={a.name} className="max-w-full max-h-full object-contain"/>
+                  ) : (a.url ? (
+                    <img src={a.url} alt={a.name} className="max-w-full max-h-full object-contain"/>
+                  ) : (
+                    <ImagePlus/>
+                  ))}
                 </div>
                 <div className="p-2 text-xs text-left truncate text-slate-300 group-hover:text-white">{a.name}</div>
                   <div className="p-2 flex items-center gap-2 text-xs">
@@ -840,6 +895,8 @@ function EditorUI(props: EditorProps) {
 
   return (
     <>
+    {/* Hidden file input for assets upload (handled by onHiddenFileChange) */}
+    <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onHiddenFileChange} />
     <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-950 to-black text-slate-100 p-2 grid grid-cols-[280px_1fr_300px] gap-2 select-none">
       {/* Left: Assets */}
       <AssetsPanel
@@ -856,7 +913,7 @@ function EditorUI(props: EditorProps) {
 
       {/* Center: Canvas & toolbar */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-visible backdrop-blur-xl">
-        <div className="px-3 py-2 border-b border-slate-800 flex items-center gap-2 relative z-20">
+        <div className="px-3 py-1 border-b border-slate-800 flex items-center gap-2 relative z-20">
           <MousePointer2 className="w-4 h-4"/><span className="font-semibold">Editor</span>
           <div className="ml-auto flex items-center gap-2">
             <div className="relative group">
@@ -881,6 +938,7 @@ function EditorUI(props: EditorProps) {
             <button title="Ripeti (Ctrl/Cmd+Y)" className={`px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 ${props.canRedo? '':'opacity-50 cursor-not-allowed'}`} onClick={()=> { if (props.canRedo && props.redo) props.redo(); }}><CornerDownRight className="w-4 h-4"/></button>
             <button className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700" onClick={()=> props.setZoom(Math.min(6, props.zoom * 1.1))}><ZoomIn className="w-4 h-4"/></button>
             <button className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700" onClick={()=> props.setZoom(Math.max(0.1, props.zoom / 1.1))}><ZoomOut className="w-4 h-4"/></button>
+            <span className="text-xs text-slate-300 ml-1">{Math.round(props.zoom*100)}%</span>
             <button className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700" onClick={()=> props.setPan({x:40,y:40})}><Move className="w-4 h-4"/></button>
             <span className="mx-2 h-5 w-px bg-slate-700 inline-block" />
             <button className={`px-2 py-0.5 rounded-lg ${props.grid? "bg-sky-700/50":"bg-slate-800 hover:bg-slate-700"}`} onClick={()=> props.setGrid(!props.grid)}><Grid3X3 className="w-4 h-4"/></button>
@@ -892,26 +950,7 @@ function EditorUI(props: EditorProps) {
             <button className="ml-2 px-2 py-0.5 rounded-lg bg-sky-600 hover:bg-sky-500 flex items-center gap-1" title="Esporta PNG" onClick={()=> {
               let scale = 1;
               try { const s = parseFloat(localStorage.getItem('lastExportScale')||''); if (s>0 && s<=1) scale = s; } catch {}
-              const out = document.createElement("canvas");
-              out.width = Math.max(1, Math.floor(props.mapSize.w * scale));
-              out.height = Math.max(1, Math.floor(props.mapSize.h * scale));
-              const ctx = out.getContext("2d")!;
-              const bg = props.assets.find(a => a.id === props.backgroundAssetId);
-              if (bg && bg.img && bg.img.complete) {
-                try { ctx.drawImage(bg.img, 0, 0, out.width, out.height); } catch (e) { ctx.fillStyle = "#0f162b"; ctx.fillRect(0,0,out.width,out.height); }
-              } else {
-                ctx.fillStyle = "#0f162b"; ctx.fillRect(0,0,out.width,out.height);
-              }
-              const ordered = [...props.sprites].sort((a,b)=> a.z - b.z);
-              for (const s of ordered) {
-                if (!s.visible) continue; const img = s.img; if (!img) continue;
-                ctx.save(); ctx.globalAlpha = s.opacity;
-                ctx.translate(s.x * scale, s.y * scale);
-                ctx.rotate((s.rotation * Math.PI)/180);
-                ctx.scale(s.scale * scale, s.scale * scale);
-                ctx.drawImage(img,0,0);
-                ctx.restore();
-              }
+              const out = renderToCanvas({ assets: props.assets, sprites: props.sprites, backgroundAssetId: props.backgroundAssetId || null, mapSize: props.mapSize, scale, transparent: false });
               const label = scale === 1 ? '100' : String(Math.round(scale*100));
               out.toBlob((blob)=> { if (!blob) return; downloadBlob(blob, `map_${Date.now()}_${label}.png`); }, "image/png");
             }}><Download className="w-4 h-4"/>Esporta</button>
@@ -919,31 +958,14 @@ function EditorUI(props: EditorProps) {
               {([1, 0.75, 0.5, 0.25] as number[]).map(scale => (
                 <button key={scale}
                   className="w-full text-left px-3 py-1 hover:bg-slate-800 text-sm"
-                  onClick={()=> {
-                    try { localStorage.setItem('lastExportScale', String(scale)); } catch {}
-                    const out = document.createElement('canvas');
-                    out.width = Math.max(1, Math.floor(props.mapSize.w * scale));
-                    out.height = Math.max(1, Math.floor(props.mapSize.h * scale));
-                    const ctx = out.getContext('2d')!;
-                    const bg = props.assets.find(a => a.id === props.backgroundAssetId);
-                    if (bg && bg.img && bg.img.complete) {
-                      try { ctx.drawImage(bg.img, 0, 0, out.width, out.height); } catch (e) { ctx.fillStyle = '#0f162b'; ctx.fillRect(0,0,out.width,out.height); }
-                    } else { ctx.fillStyle = '#0f162b'; ctx.fillRect(0,0,out.width,out.height); }
-                    const ordered = [...props.sprites].sort((a,b)=> a.z - b.z);
-                    for (const s of ordered) {
-                      if (!s.visible) continue; const img = s.img; if (!img) continue;
-                      ctx.save(); ctx.globalAlpha = s.opacity;
-                      ctx.translate(s.x * scale, s.y * scale);
-                      ctx.rotate((s.rotation * Math.PI)/180);
-                      ctx.scale(s.scale * scale, s.scale * scale);
-                      ctx.drawImage(img,0,0);
-                      ctx.restore();
-                    }
-                    const label = scale === 1 ? '100' : String(Math.round(scale*100));
-                    out.toBlob((blob)=> { if (!blob) return; downloadBlob(blob, `map_${Date.now()}_${label}.png`); }, 'image/png');
-                  }}>
-                  Esporta {Math.round(scale*100)}%
-                </button>
+                   onClick={()=> {
+                     try { localStorage.setItem('lastExportScale', String(scale)); } catch {}
+                     const out = renderToCanvas({ assets: props.assets, sprites: props.sprites, backgroundAssetId: props.backgroundAssetId || null, mapSize: props.mapSize, scale, transparent: false });
+                     const label = scale === 1 ? '100' : String(Math.round(scale*100));
+                     out.toBlob((blob)=> { if (!blob) return; downloadBlob(blob, `map_${Date.now()}_${label}.png`); }, 'image/png');
+                   }}>
+                   Esporta {Math.round(scale*100)}%
+                 </button>
               ))}
             </div>
             </div>
@@ -958,24 +980,7 @@ function EditorUI(props: EditorProps) {
                 Mappa molto grande ({(props.mapSize.w)}×{(props.mapSize.h)}). Suggerimento: usa export downscale.
                 <button className="ml-2 underline hover:no-underline" onClick={()=> {
                   const scale = 0.5;
-                  const out = document.createElement('canvas');
-                  out.width = Math.max(1, Math.floor(props.mapSize.w * scale));
-                  out.height = Math.max(1, Math.floor(props.mapSize.h * scale));
-                  const ctx = out.getContext('2d')!;
-                  const bg = props.assets.find(a => a.id === props.backgroundAssetId);
-                  if (bg && bg.img && bg.img.complete) {
-                    try { ctx.drawImage(bg.img, 0, 0, out.width, out.height); } catch (e) { ctx.fillStyle = '#0f162b'; ctx.fillRect(0,0,out.width,out.height); }
-                  } else { ctx.fillStyle = '#0f162b'; ctx.fillRect(0,0,out.width,out.height); }
-                  const ordered = [...props.sprites].sort((a,b)=> a.z - b.z);
-                  for (const s of ordered) {
-                    if (!s.visible) continue; const img = s.img; if (!img) continue;
-                    ctx.save(); ctx.globalAlpha = s.opacity;
-                    ctx.translate(s.x * scale, s.y * scale);
-                    ctx.rotate((s.rotation * Math.PI)/180);
-                    ctx.scale(s.scale * scale, s.scale * scale);
-                    ctx.drawImage(img,0,0);
-                    ctx.restore();
-                  }
+                  const out = renderToCanvas({ assets: props.assets, sprites: props.sprites, backgroundAssetId: props.backgroundAssetId || null, mapSize: props.mapSize, scale, transparent: false });
                   out.toBlob((blob)=> { if (!blob) return; downloadBlob(blob, `map_${Date.now()}_50.png`); }, 'image/png');
                 }}>Esporta 50%</button>
               </div>
@@ -1032,12 +1037,12 @@ function EditorUI(props: EditorProps) {
           <hr className="border-slate-800"/>
           <div className="space-y-2">
             <div className="text-xs text-slate-400">Layer (alto = sopra)</div>
-            <div className="h-[40vh] overflow-auto flex flex-col gap-2">
+            <div className="h-[50vh] overflow-auto flex flex-col gap-2">
               {[...props.sprites].sort((a,b)=> b.z - a.z).map(s => (
                 <div key={s.id} className={`flex items-center justify-between gap-2 p-2 rounded-lg border ${s.id===props.selectedId? "border-sky-400 bg-sky-400/10":"border-slate-800 bg-slate-800/40"}`} onClick={()=> props.setSelectedId(s.id)} onContextMenu={(e)=> { e.preventDefault(); setContextMenu({ visible: true, x: e.clientX, y: e.clientY, type: 'sprite', id: s.id, name: s.name }); }}>
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-9 h-9 rounded-md overflow-hidden bg-slate-900 grid place-items-center border border-slate-700">
-                      <img src={s.img.src} alt={s.name} className="max-w-full max-h-full object-contain"/>
+                      <img src={(s.img && s.img.src) || (props.assets.find(a => a.name === s.name)?.img?.src || props.assets.find(a => a.name === s.name)?.url || '')} alt={s.name} className="max-w-full max-h-full object-contain"/>
                     </div>
                     <div className="truncate text-sm">{s.name}</div>
                   </div>
@@ -1152,3 +1157,10 @@ function EditorUI(props: EditorProps) {
       </>
   );
 }
+
+
+
+
+
+
+

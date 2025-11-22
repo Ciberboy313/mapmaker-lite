@@ -54,7 +54,7 @@ export default function MapCanvas({ sprites, setSprites, setSpritesImmediate, se
         canvas.width = cssW * dpr; canvas.height = cssH * dpr;
       }
       ctx.save(); ctx.scale(dpr, dpr);
-      ctx.fillStyle = "#0b1020"; ctx.fillRect(0,0,cssW,cssH);
+      ctx.fillStyle = "#000000"; ctx.fillRect(0,0,cssW,cssH);
       if (grid) {
         ctx.save(); ctx.translate(pan.x, pan.y); ctx.scale(zoom, zoom);
         ctx.strokeStyle = "#1f2a44"; ctx.lineWidth = 1/zoom;
@@ -95,12 +95,13 @@ export default function MapCanvas({ sprites, setSprites, setSpritesImmediate, se
   }, [pan.x, pan.y, zoom]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
-    if (selectedId && (tool === 'rotate' || tool === 'scale')) {
+    // If an object is selected, apply tools to it (rotate/scale) and do not zoom the canvas
+    if (selectedId) {
       e.preventDefault();
       if (!wheelBatchActiveRef.current) { wheelBatchActiveRef.current = true; onInteractStart && onInteractStart(); }
       if (tool === 'rotate') {
         (setSpritesImmediate || setSprites)(prev => prev.map(s => s.id === selectedId ? { ...s, rotation: s.rotation + (e.deltaY > 0 ? 2 : -2) } : s));
-      } else {
+      } else { // treat select/scale as scale tool for wheel
         (setSpritesImmediate || setSprites)(prev => prev.map(s => s.id === selectedId ? { ...s, scale: Math.max(0.01, s.scale * (e.deltaY > 0 ? 0.95 : 1.05)) } : s));
       }
       if (wheelTimeoutRef.current) { window.clearTimeout(wheelTimeoutRef.current); }
@@ -111,14 +112,41 @@ export default function MapCanvas({ sprites, setSprites, setSpritesImmediate, se
       }, 180);
       return;
     }
-    const factor = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.min(8, Math.max(0.1, zoom * factor));
-    setZoom(newZoom);
-  }, [zoom, setZoom, selectedId, setSprites, tool]);
+    // No selection: only zoom if Ctrl/Cmd è premuto; altrimenti pan
+    if (e.ctrlKey || (e as any).metaKey) {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.min(8, Math.max(0.1, zoom * factor));
+      setZoom(newZoom);
+    } else {
+      e.preventDefault();
+      // Pan with wheel: trackpad friendly
+      const dx = (e as any).deltaX ?? 0;
+      const dy = e.deltaY;
+      setPan({ x: pan.x - dx, y: pan.y - dy });
+    }
+  }, [zoom, setZoom, selectedId, setSprites, tool, setSpritesImmediate, onInteractStart, onInteractEnd, setPan, pan.x, pan.y]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     const { x, y } = toWorld(e.clientX, e.clientY);
     // interactions first
+    if (draggingRef.current) {
+      const d = draggingRef.current;
+      const sprite = sprites.find(s => s.id === d.id);
+      if (sprite) {
+        const cos = Math.cos(degToRad(sprite.rotation));
+        const sin = Math.sin(degToRad(sprite.rotation));
+        // Convert stored local offset back to world delta
+        const wx = d.offsetX * sprite.scale;
+        const wy = d.offsetY * sprite.scale;
+        const dx = wx * cos - wy * sin;
+        const dy = wx * sin + wy * cos;
+        const nx = x - dx;
+        const ny = y - dy;
+        (setSpritesImmediate || setSprites)(prev => prev.map(s => s.id === d.id ? { ...s, x: nx, y: ny } : s));
+      }
+      return;
+    }
     if (rotatingRef.current) {
       const r = rotatingRef.current;
       const dx = e.clientX - r.startX;
@@ -148,8 +176,8 @@ export default function MapCanvas({ sprites, setSprites, setSpritesImmediate, se
   }, [orderedByZDesc, toWorld, setSprites]);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
-    const isPan = e.button === 1 || (e.button === 0 && (e.shiftKey || tool === 'pan'));
-    if (isPan) { panningRef.current = true; return; }
+    // Middle button or Shift+Left always pan
+    if (e.button === 1 || (e.button === 0 && e.shiftKey)) { panningRef.current = true; return; }
     const { x, y } = toWorld(e.clientX, e.clientY);
     const ordered = [...sprites].sort((a,b)=> b.z - a.z);
     let picked: Sprite | null = null;
@@ -180,6 +208,8 @@ export default function MapCanvas({ sprites, setSprites, setSpritesImmediate, se
         draggingRef.current = { id: picked.id, offsetX: lx, offsetY: ly, startScale: picked.scale, startRotation: picked.rotation };
       }
     } else {
+      // If tool is pan and nothing picked with left button, start panning
+      if (e.button === 0 && tool === 'pan') { panningRef.current = true; return; }
       setSelectedId(null);
     }
   }, [sprites, setSelectedId, toWorld, onRequestDelete, tool]);

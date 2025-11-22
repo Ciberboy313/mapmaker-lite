@@ -59,7 +59,7 @@ Step 5 — QA e rifiniture
   - [ ] Undo/Redo per move/rotate/scale/opacity/lock
 
 ## Backlog tecnico
-- [ ] Revoca `URL.revokeObjectURL` su rimozione/replace/background
+- [x] Revoca `URL.revokeObjectURL` su rimozione/replace/background
 - [ ] Export sicuro per mappe enormi (downscale/tiled export)
 - [ ] Persistenza in IndexedDB (auto‑save + recenti)
 - [ ] Performance rendering: disegno “dirty” e culling offscreen
@@ -68,3 +68,26 @@ Step 5 — QA e rifiniture
 - Mantenere la compatibilità con il menu nativo e l’IPC.
 - Non introdurre zoom dell’UI: solo zoom del canvas/asset.
 - Ogni step deve essere piccolo e verificabile.
+
+---
+
+## Aggiornamenti recenti (2025-11-15)
+
+- Export unificato con utility condivisa; undo/redo limitato (100).
+- Interazioni: pan/drag separati, wheel su sprite selezionato solo per quello.
+- Modale "Crea mappa": Enter/Escape, chiusura su conferma, fix caricamento background selezionato.
+- Layout: nessuno scroll pagina; workspace adattivo; fondo canvas nero.
+
+## Prossime azioni
+
+- Migrare il linking sprite→asset da `name` a `assetId` (robustezza anteprime layer e salvataggi).
+- Rifinire hit-test per sprite piccoli/ruotati; cursori contestuali coerenti.
+- Unificare completamente export modale sulla utility (alpha/background) ed estendere QA export.
+- Compattare ulteriormente top/header/overlay per massimizzare l'altezza utile.
+- Aggiungere preview del background selezionato nel modale prima della creazione.
+
+## QA Focus
+
+- Popup "Crea mappa": Enter/Escape, conferma chiude sempre, applica dimensioni e background.
+- Wheel: con selezione attiva non zooma il canvas; Ctrl/Cmd + wheel = zoom; wheel senza selezione = pan.
+- Anteprime in Livelli: `sprite.img.src` con fallback `asset.img.src`/`asset.url`.

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -71,13 +71,7 @@ function createWindow() {
       label: 'File',
       submenu: [
         { label: 'Nuova mappa…', click: () => send('file:new') },
-        {
-          label: 'Nuova mappa veloce',
-          submenu: [
-            { label: '4096×3072 (Medium)', click: () => send('file:new-quick', { w: 4096, h: 3072 }) },
-            { label: '1920×1080 (Small)', click: () => send('file:new-quick', { w: 1920, h: 1080 }) },
-          ]
-        },
+        // Rimosso: Nuova mappa veloce (i preset sono nel modale Nuova mappa)
         { type: 'separator' },
         { label: 'Apri progetto…', click: () => send('file:open-project') },
         { label: 'Salva progetto', click: () => send('file:save-project') },
@@ -192,6 +186,7 @@ function initFileLogs() {
 
 app.whenReady().then(() => {
   initFileLogs();
+  try { session.defaultSession && session.defaultSession.setCacheDisabled(true); } catch {}
   createWindow();
   app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow());
   ipcMain.on('log:renderer', (_e, entry) => {

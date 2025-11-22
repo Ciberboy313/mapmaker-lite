@@ -115,8 +115,8 @@ export default function AssetsPanel({ assets, setAssets, folders, setFolders, se
           {visible.map(a => (
             <div key={a.id} className="rounded-md border border-slate-700 bg-slate-800/40 p-1 select-none" draggable onDragStart={(e)=> { e.dataTransfer.setData('text/plain', a.id); e.dataTransfer.setData('assetId', a.id); }} onContextMenu={(e)=> openContextMenu(e, 'asset', a.id)}>
               <div className="w-full" style={{ height: thumb }}>
-                {a.img ? (
-                  <img src={a.img.src} alt={a.name} className="w-full h-full object-contain"/>
+                {(a.img?.src || a.url) ? (
+                  <img src={a.img?.src || a.url} alt={a.name} className="w-full h-full object-contain" decoding="async"/>
                 ) : (
                   <div className="w-full h-full grid place-items-center text-xs text-slate-400">no preview</div>
                 )}
